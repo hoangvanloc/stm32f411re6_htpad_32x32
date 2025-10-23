@@ -81,10 +81,8 @@ typedef struct
   DATA_POS, \
 }
 characteristics DevConst = DevConstDEF;
-
 typedef struct
 {
-	//-----------------------------------------
 	// EEPROM DATA
 	uint8_t mbit_calib, bias_calib, clk_calib, bpa_calib, pu_calib, mbit_user, bias_user, clk_user, bpa_user, pu_user;
 	uint8_t nrofdefpix, gradscale, vddscgrad, vddscoff, epsilon, lastepsilon, arraytype;
@@ -97,104 +95,93 @@ typedef struct
 	uint16_t vddcompgrad[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
 	uint16_t vddcompoff[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
 	uint32_t id, ptatoff;
-	float ptatgr_float, ptatoff_float, pixcmin, pixcmax, bw;
+	float ptatgr_float, ptatoff_float, pixcmin, pixcmax;
 	// use a heap allocated memory to store the pixc instead of a nxm array
 	uint32_t *pixc2_0; // start address of the allocated heap memory
 	uint32_t *pixc2; // increasing address pointer
 }eeprom_t;
 
-//-----------------------------------------
-// EEPROM DATA
-//uint8_t mbit_calib, bias_calib, clk_calib, bpa_calib, pu_calib, mbit_user, bias_user, clk_user, bpa_user, pu_user;
-//uint8_t nrofdefpix, gradscale, vddscgrad, vddscoff, epsilon, lastepsilon, arraytype;
-//uint8_t deadpixmask[ALLOWED_DEADPIX];
-//uint8_t globaloff;
-//uint16_t thgrad[PIXEL_PER_COLUMN][PIXEL_PER_ROW];
-//uint16_t tablenumber, vddth1, vddth2, ptatth1, ptatth2, ptatgr, globalgain;
-//uint16_t deadpixadr[ALLOWED_DEADPIX * 2];
-//uint16_t thoffset[PIXEL_PER_COLUMN][PIXEL_PER_ROW];
-//uint16_t vddcompgrad[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
-//uint16_t vddcompoff[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
-//uint32_t id, ptatoff;
-//float ptatgr_float, ptatoff_float, pixcmin, pixcmax, bw;
-//// use a heap allocated memory to store the pixc instead of a nxm array
-//uint32_t *pixc2_0; // start address of the allocated heap memory
-//uint32_t *pixc2; // increasing address pointer
 
+eeprom_t eep;
+
+// SENSOR DATA
 typedef struct
 {
 	uint16_t data_pixel[PIXEL_PER_COLUMN][PIXEL_PER_ROW];
 	uint8_t RAMoutput[2 * NUMBER_OF_BLOCKS + 2][BLOCK_LENGTH];
-}sensor_t;
+	uint16_t eloffset[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
+	uint8_t statusreg;
+	uint16_t Ta, ptat_av_uint16, vdd_av_uint16;
+}sensor_dat_t;
 //-----------------------------------------
 // SENSOR DATA
-//uint16_t data_pixel[PIXEL_PER_COLUMN][PIXEL_PER_ROW];
-//uint8_t RAMoutput[2 * NUMBER_OF_BLOCKS + 2][BLOCK_LENGTH];
+sensor_dat_t ss_dat;
 /*
-  RAMoutput is the place where the raw values are saved
+  ss_dat.RAMoutput is the place where the raw values are saved
 
   example, order for 80x64:
-  RAMoutput[0][]... data from block 0 top
-  RAMoutput[1][]... data from block 1 top
-  RAMoutput[2][]... data from block 2 top
-  RAMoutput[3][]... data from block 3 top
+  ss_dat.RAMoutput[0][]... data from block 0 top
+  ss_dat.RAMoutput[1][]... data from block 1 top
+  ss_dat.RAMoutput[2][]... data from block 2 top
+  ss_dat.RAMoutput[3][]... data from block 3 top
   RAMutput[4][]... electrical offset top
-  RAMoutput[5][]... electrical offset bottom
-  RAMoutput[6][]... data from block 3 bottom
-  RAMoutput[7][]... data from block 2 bottom
-  RAMoutput[8][]... data from block 1 bottom
-  RAMoutput[9][]... data from block 0 bottom
+  ss_dat.RAMoutput[5][]... electrical offset bottom
+  ss_dat.RAMoutput[6][]... data from block 3 bottom
+  ss_dat.RAMoutput[7][]... data from block 2 bottom
+  ss_dat.RAMoutput[8][]... data from block 1 bottom
+  ss_dat.RAMoutput[9][]... data from block 0 bottom
 
 */
-uint16_t eloffset[ROW_PER_BLOCK * 2][PIXEL_PER_ROW];
-uint8_t statusreg;
-uint16_t Ta, ptat_av_uint16, vdd_av_uint16;
+
 
 
 // BUFFER for PTAT,VDD and elOffsets
-// PTAT:
-uint16_t ptat_buffer[PTAT_BUFFER_SIZE];
-uint16_t ptat_buffer_average;
-uint8_t use_ptat_buffer = 0;
-uint8_t ptat_i = 0;
-uint8_t PTATok = 0;
-// VDD:
-uint16_t vdd_buffer[VDD_BUFFER_SIZE];
-uint16_t vdd_buffer_average;
-uint8_t use_vdd_buffer = 0;
-uint8_t vdd_i = 0;
-// electrical offsets:
-uint8_t use_eloffsets_buffer = 0;
-uint8_t eloffsets_i = 0;
-uint8_t new_offsets = 1;
+typedef struct
+{
+	// PTAT:
+	uint16_t ptat_buffer[PTAT_BUFFER_SIZE];
+	uint8_t use_ptat_buffer;
+	uint8_t ptat_i;
+	// VDD:
+	uint16_t vdd_buffer[VDD_BUFFER_SIZE];
+	uint8_t use_vdd_buffer;
+	uint8_t vdd_i;
+	// electrical offsets:
+	uint8_t use_eloffsets_buffer;
+	uint8_t new_offsets;
+}pve_buf_t;
 
-// PROGRAMM CONTROL
-bool switch_ptat_vdd = 0;
-uint8_t adr_offset = 0x00;
-uint8_t send_data = 0;
-uint16_t picnum = 0;
-uint8_t state = 0;
-uint8_t read_block_num = START_WITH_BLOCK; // start with electrical offset
-uint8_t read_eloffset_next_pic = 0;
+pve_buf_t pve_buf = {.new_offsets = 1};
 
-uint8_t wait_pic = 0;
-bool ReadingRoutineEnable = 1;
+typedef struct
+{
+	// PROGRAMM CONTROL
+	bool switch_ptat_vdd;
+	uint8_t adr_offset;
+	uint16_t picnum;
+	uint8_t state;
+	uint8_t read_block_num; // start with electrical offset
+	uint8_t read_eloffset_next_pic;
 
-// OTHER
-uint32_t gradscale_div;
-uint32_t vddscgrad_div;
-uint32_t vddscoff_div;
-int vddcompgrad_n;
-int vddcompoff_n;
-uint32_t t1;
-uint8_t print_state = 0;
+	bool ReadingRoutineEnable;
+	// OTHER
+	uint32_t gradscale_div;
+	uint32_t vddscgrad_div;
+	uint32_t vddscoff_div;
+	int32_t vddcompgrad_n;
+	int32_t vddcompoff_n;
+	uint8_t NewDataAvailable;
+	uint16_t timert;
+}var_ctrl_t;
+var_ctrl_t var_ctrl =
+{
+	.ReadingRoutineEnable = 1,
+    .read_block_num = START_WITH_BLOCK
+};
 
 
-uint8_t NewDataAvailable = 0;
-
-uint16_t timert;
 char serial_input = 'm';
-
+uint8_t print_state = 0;
 
 
 
@@ -225,14 +212,14 @@ void setup(void)
   //*******************************************************************
   //this is special for the ESP32, because it isn't enough space in the stack
   // you don't have to do that in this way if you have enough space to store pixc as global variable
-  pixc2_0 = (uint32_t*)calloc(NUMBER_OF_PIXEL * 4, 1);
-  if (pixc2_0 == NULL)
+  eep.pixc2_0 = (uint32_t*)calloc(NUMBER_OF_PIXEL * 4, 1);
+  if (eep.pixc2_0 == NULL)
   {
 	printf("Allocate memory failed\n");
   }else
   {
     printf("Allocate memory succeeded\n");
-    pixc2 = pixc2_0; // set pointer to start address of the allocated heap
+    eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
   }
 
 
@@ -270,16 +257,16 @@ void setup(void)
   //*******************************************************************
   // do bigger calculation here before you jump into the loop() function
   //*******************************************************************
-  gradscale_div = pow(2, gradscale);
-  vddscgrad_div = pow(2, vddscgrad);
-  vddscoff_div = pow(2, vddscoff);
+  var_ctrl.gradscale_div = pow(2, eep.gradscale);
+  var_ctrl.vddscgrad_div = pow(2, eep.vddscgrad);
+  var_ctrl.vddscoff_div = pow(2, eep.vddscoff);
   calcPixC(); // calculate the pixel constants
 
   //*******************************************************************
   // timer initialization
   //*******************************************************************
-  timert = calc_timert(clk_calib, mbit_calib);
-  __HAL_TIM_SET_AUTORELOAD(&htim3, timert);
+  var_ctrl.timert = calc_timert(eep.clk_calib, eep.mbit_calib);
+  __HAL_TIM_SET_AUTORELOAD(&htim3, var_ctrl.timert);
 
   //*******************************************************************
   // print the menu for the first time
@@ -300,7 +287,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
      // Called when TIM3 reaches its period and overflows
   	  // read new sensor data
-		if (ReadingRoutineEnable)
+		if (var_ctrl.ReadingRoutineEnable)
 		{
 		/*
 		   HINT:
@@ -310,7 +297,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		   because the ESP32 cannot read I2C data directly in the TimerISR. If your µC can handle I2C in
 		   an interrupt,please read the new sensor volatges direclty in the TimerISR.
 		*/
-		   NewDataAvailable = 1;
+		   var_ctrl.NewDataAvailable = 1;
 		}
     }
 }
@@ -325,7 +312,7 @@ void printWrongLUT()
   for (int m = 0; m < 8; m++) {
     for (int n = 0; n < 8; n++) {
       if (LUTshape[m][n] == 1)
-        data_pixel[m][n] = 2732;
+        ss_dat.data_pixel[m][n] = 2732;
     }
   }
 }
@@ -338,12 +325,12 @@ void printWrongLUT()
 void loop(void)
 {
 
-  /* check if the timer interrupt set the NewDataAvailable flag. If so
+  /* check if the timer interrupt set the var_ctrl.NewDataAvailable flag. If so
      read the new raw pixel data via I2C */
-  if (NewDataAvailable)
+  if (var_ctrl.NewDataAvailable)
   {
     readblockinterrupt();
-    NewDataAvailable = 0;
+    var_ctrl.NewDataAvailable = 0;
   }
 
 // if(((millis() - old_time)&0xFFFFFFFF) > SEND_DUTY)
@@ -354,11 +341,11 @@ void loop(void)
 #ifdef SERIALMODE
   checkSerial();
 #endif
-  if (state)
-  { // state is 1 when all raw sensor voltages are read for this picture
+  if (var_ctrl.state)
+  { // var_ctrl.state is 1 when all raw sensor voltages are read for this picture
 
     sort_data(); // sort the data if the reading routing is done
-    state = 0; // reset the state to sample new raw pixel data
+    var_ctrl.state = 0; // reset the var_ctrl.state to sample new raw pixel data
     //*******************************************************************
     // SERIAL OUTPUT
     //*******************************************************************
@@ -422,33 +409,33 @@ void calcPixC(void)
 
   /* uses the formula from datasheet:
 
-                     PixC_uns[m][n]*(PixCmax-PixCmin)               epsilon   GlobalGain
+                     PixC_uns[m][n]*(PixCmax-PixCmin)               eep.epsilon   GlobalGain
       PixC[m][n] = ( -------------------------------- + PixCmin ) * ------- * ----------
                                   65535                               100        1000
   */
 
   double pixcij;
-  pixc2 = pixc2_0; // set pointer to start address of the allocated heap
+  eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
 
   for (int m = 0; m < DevConst.PixelPerColumn; m++) {
     for (int n = 0; n < DevConst.PixelPerRow; n++) {
 
-      pixcij = (double)pixcmax;
-      pixcij -= (double)pixcmin;
+      pixcij = (double)eep.pixcmax;
+      pixcij -= (double)eep.pixcmin;
       pixcij /= (double)65535.0;
-      pixcij *= (double) * pixc2;
-      pixcij += (double)pixcmin;
+      pixcij *= (double) * eep.pixc2;
+      pixcij += (double)eep.pixcmin;
       pixcij /= (double)100.0;
-      pixcij *= (double)epsilon;
+      pixcij *= (double)eep.epsilon;
       pixcij /= (double)10000.0;
-      pixcij *= (double)globalgain;
+      pixcij *= (double)eep.globalgain;
       pixcij += 0.5;
 
-      *pixc2 = (uint32_t)pixcij;
-      pixc2++;
+      *eep.pixc2 = (uint32_t)pixcij;
+      eep.pixc2++;
     }
   }
-  lastepsilon = epsilon;
+  eep.lastepsilon = eep.epsilon;
 }
 
 
@@ -465,18 +452,18 @@ void calculate_pixel_temp(void)
   uint16_t table_row, table_col;
   int32_t vx, vy, ydist, dta;
   signed long pixel;
-  pixc2 = pixc2_0; // set pointer to start address of the allocated heap
+  eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
 
 
   /******************************************************************************************************************
     step 0: find column of lookup table
   ******************************************************************************************************************/
   for (int i = 0; i < NROFTAELEMENTS; i++) {
-    if (Ta > XTATemps[i]) {
+    if (ss_dat.Ta > XTATemps[i]) {
       table_col = i;
     }
   }
-  dta = Ta - XTATemps[table_col];
+  dta = ss_dat.Ta - XTATemps[table_col];
   ydist = (int32_t)ADEQUIDISTANCE;
 
 
@@ -488,22 +475,22 @@ void calculate_pixel_temp(void)
       /******************************************************************************************************************
          step 1: use a variable with bigger data format for the compensation steps
        ******************************************************************************************************************/
-      pixel = (signed long) data_pixel[m][n];
+      pixel = (signed long) ss_dat.data_pixel[m][n];
 
       /******************************************************************************************************************
          step 2: compensate thermal drifts (see datasheet, chapter: Thermal Offset)
        ******************************************************************************************************************/
-      pixel -= (int32_t)(((int32_t)thgrad[m][n] * (int32_t)ptat_av_uint16) / (int32_t)gradscale_div);
-      pixel -= (int32_t)thoffset[m][n];
+      pixel -= (int32_t)(((int32_t)eep.thgrad[m][n] * (int32_t)ss_dat.ptat_av_uint16) / (int32_t)var_ctrl.gradscale_div);
+      pixel -= (int32_t)eep.thoffset[m][n];
 
       /******************************************************************************************************************
          step 3: compensate electrical offset (see datasheet, chapter: Electrical Offset)
        ******************************************************************************************************************/
       if (m < DevConst.PixelPerColumn / 2) { // top half
-        pixel -= eloffset[m % DevConst.RowPerBlock][n];
+        pixel -= ss_dat.eloffset[m % DevConst.RowPerBlock][n];
       }
       else { // bottom half
-        pixel -= eloffset[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        pixel -= ss_dat.eloffset[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
       }
 
       /******************************************************************************************************************
@@ -511,27 +498,27 @@ void calculate_pixel_temp(void)
        ******************************************************************************************************************/
       // first select VddCompGrad and VddCompOff for pixel m,n:
       if (m < DevConst.PixelPerColumn / 2) {      // top half
-        vddcompgrad_n = vddcompgrad[m % DevConst.RowPerBlock][n];
-        vddcompoff_n = vddcompoff[m % DevConst.RowPerBlock][n];
+        var_ctrl.vddcompgrad_n = eep.vddcompgrad[m % DevConst.RowPerBlock][n];
+        var_ctrl.vddcompoff_n = eep.vddcompoff[m % DevConst.RowPerBlock][n];
       }
       else {       // bottom half
-        vddcompgrad_n = vddcompgrad[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
-        vddcompoff_n = vddcompoff[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        var_ctrl.vddcompgrad_n = eep.vddcompgrad[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        var_ctrl.vddcompoff_n = eep.vddcompoff[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
       }
       // now do the vdd calculation
-      vdd_calc_steps = vddcompgrad_n * ptat_av_uint16;
-      vdd_calc_steps = vdd_calc_steps / vddscgrad_div;
-      vdd_calc_steps = vdd_calc_steps + vddcompoff_n;
-      vdd_calc_steps = vdd_calc_steps * ( vdd_av_uint16 - vddth1 - ((vddth2 - vddth1) / (ptatth2 - ptatth1)) * (ptat_av_uint16  - ptatth1));
-      vdd_calc_steps = vdd_calc_steps / vddscoff_div;
+      vdd_calc_steps = var_ctrl.vddcompgrad_n * ss_dat.ptat_av_uint16;
+      vdd_calc_steps = vdd_calc_steps / var_ctrl.vddscgrad_div;
+      vdd_calc_steps = vdd_calc_steps + var_ctrl.vddcompoff_n;
+      vdd_calc_steps = vdd_calc_steps * ( ss_dat.vdd_av_uint16 - eep.vddth1 - ((eep.vddth2 - eep.vddth1) / (eep.ptatth2 - eep.ptatth1)) * (ss_dat.ptat_av_uint16  - eep.ptatth1));
+      vdd_calc_steps = vdd_calc_steps / var_ctrl.vddscoff_div;
       pixel -= vdd_calc_steps;
 
       /******************************************************************************************************************
          step 5: multiply sensitivity coeff for each pixel (see datasheet, chapter: Object Temperature)
        ******************************************************************************************************************/
       vij_pixc_and_pcscaleval = pixel * (int64_t)PCSCALEVAL;
-      pixel =  (int32_t)(vij_pixc_and_pcscaleval / *pixc2);
-      pixc2++;
+      pixel =  (int32_t)(vij_pixc_and_pcscaleval / *eep.pixc2);
+      eep.pixc2++;
       /******************************************************************************************************************
          step 6: find correct temp for this sensor in lookup table and do a bilinear interpolation (see datasheet, chapter:  Look-up table)
        ******************************************************************************************************************/
@@ -545,12 +532,12 @@ void calculate_pixel_temp(void)
       /******************************************************************************************************************
          step 7: add GlobalOffset (stored as signed char)
        ******************************************************************************************************************/
-      pixel += globaloff;
+      pixel += eep.globaloff;
 
       /******************************************************************************************************************
         step 8: overwrite the uncompensate pixel with the new calculated compensated value
       ******************************************************************************************************************/
-      data_pixel[m][n] = (uint16_t)pixel;
+      ss_dat.data_pixel[m][n] = (uint16_t)pixel;
 
     }
   }
@@ -594,51 +581,51 @@ void pixel_masking(void)
   uint8_t number_neighbours[ALLOWED_DEADPIX];
   uint32_t temp_defpix[ALLOWED_DEADPIX];
 
-  for (int i = 0; i < nrofdefpix; i++) {
+  for (int i = 0; i < eep.nrofdefpix; i++) {
     number_neighbours[i] = 0;
     temp_defpix[i] = 0;
 
     // top half
-    if (deadpixadr[i] < (uint16_t)(NUMBER_OF_PIXEL / 2)) {
+    if (eep.deadpixadr[i] < (uint16_t)(NUMBER_OF_PIXEL / 2)) {
 
-      if ( (deadpixmask[i] & 1 )  == 1) {
+      if ( (eep.deadpixmask[i] & 1 )  == 1) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW)];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW)];
       }
 
-      if ( (deadpixmask[i] & 2 )  == 2 ) {
+      if ( (eep.deadpixmask[i] & 2 )  == 2 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 4 )  == 4 ) {
+      if ( (eep.deadpixmask[i] & 4 )  == 4 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW)][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW)][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 8 )  == 8 ) {
+      if ( (eep.deadpixmask[i] & 8 )  == 8 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 16 )  == 16 ) {
+      if ( (eep.deadpixmask[i] & 16 )  == 16 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW)];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW)];
       }
 
-      if ( (deadpixmask[i] & 32 )  == 32 ) {
+      if ( (eep.deadpixmask[i] & 32 )  == 32 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
 
-      if ( (deadpixmask[i] & 64 )  == 64 ) {
+      if ( (eep.deadpixmask[i] & 64 )  == 64 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW)][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW)][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
 
-      if ( (deadpixmask[i] & 128 )  == 128 ) {
+      if ( (eep.deadpixmask[i] & 128 )  == 128 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
 
     }
@@ -646,49 +633,49 @@ void pixel_masking(void)
     // bottom half
     else {
 
-      if ( (deadpixmask[i] & 1 )  == 1 ) {
+      if ( (eep.deadpixmask[i] & 1 )  == 1 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW)];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW)];
       }
 
-      if ( (deadpixmask[i] & 2 )  == 2 ) {
+      if ( (eep.deadpixmask[i] & 2 )  == 2 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 4 )  == 4 ) {
+      if ( (eep.deadpixmask[i] & 4 )  == 4 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW)][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW)][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 8 )  == 8 ) {
+      if ( (eep.deadpixmask[i] & 8 )  == 8 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW) + 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) + 1];
       }
 
-      if ( (deadpixmask[i] & 16 )  == 16 ) {
+      if ( (eep.deadpixmask[i] & 16 )  == 16 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW)];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW)];
       }
 
-      if ( (deadpixmask[i] & 32 )  == 32 ) {
+      if ( (eep.deadpixmask[i] & 32 )  == 32 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) - 1][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) - 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
 
-      if ( (deadpixmask[i] & 64 )  == 64 ) {
+      if ( (eep.deadpixmask[i] & 64 )  == 64 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW)][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW)][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
 
-      if ( (deadpixmask[i] & 128 )  == 128 ) {
+      if ( (eep.deadpixmask[i] & 128 )  == 128 ) {
         number_neighbours[i]++;
-        temp_defpix[i] = temp_defpix[i] + data_pixel[(deadpixadr[i] / PIXEL_PER_ROW) + 1][(deadpixadr[i] % PIXEL_PER_ROW) - 1];
+        temp_defpix[i] = temp_defpix[i] + ss_dat.data_pixel[(eep.deadpixadr[i] / PIXEL_PER_ROW) + 1][(eep.deadpixadr[i] % PIXEL_PER_ROW) - 1];
       }
     }
 
     temp_defpix[i] = temp_defpix[i] / number_neighbours[i];
-    data_pixel[deadpixadr[i] / PIXEL_PER_ROW][deadpixadr[i] % PIXEL_PER_ROW] = temp_defpix[i];
+    ss_dat.data_pixel[eep.deadpixadr[i] / PIXEL_PER_ROW][eep.deadpixadr[i] % PIXEL_PER_ROW] = temp_defpix[i];
 
   }
 
@@ -698,7 +685,7 @@ void pixel_masking(void)
 /********************************************************************
    Function:        void readblockinterrupt()
    Description:     read one sensor block and change configuration register to next block
-                    (also read electrical offset when read_eloffset_next_pic is set)
+                    (also read electrical offset when var_ctrl.read_eloffset_next_pic is set)
  *******************************************************************/
 void readblockinterrupt(void)
 {
@@ -706,71 +693,71 @@ void readblockinterrupt(void)
   uint8_t bottomblock;
 
 
-  ReadingRoutineEnable = 0;
+  var_ctrl.ReadingRoutineEnable = 0;
   __HAL_TIM_SET_COUNTER(&htim3, 0);//Reset counter
 
   // wait for end of conversion bit (~27ms)
 
   // check EOC bit
-  read_sensor_register( STATUS_REGISTER, (uint8_t*)&statusreg, 1);
-  while ((statusreg & 0x01) == 0)
+  read_sensor_register( STATUS_REGISTER, (uint8_t*)&ss_dat.statusreg, 1);
+  while ((ss_dat.statusreg & 0x01) == 0)
   {
-    read_sensor_register( STATUS_REGISTER, (uint8_t*)&statusreg, 1);
+    read_sensor_register( STATUS_REGISTER, (uint8_t*)&ss_dat.statusreg, 1);
   }
   // get data of top half:
-  read_sensor_register( TOP_HALF, (uint8_t*)&RAMoutput[read_block_num], BLOCK_LENGTH);
+  read_sensor_register( TOP_HALF, (uint8_t*)&ss_dat.RAMoutput[var_ctrl.read_block_num], BLOCK_LENGTH);
   // get data of bottom half:
-  bottomblock = (uint8_t)((uint8_t)(NUMBER_OF_BLOCKS + 1) * 2 - read_block_num - 1);
-  read_sensor_register( BOTTOM_HALF, (uint8_t*)&RAMoutput[bottomblock], BLOCK_LENGTH);
+  bottomblock = (uint8_t)((uint8_t)(NUMBER_OF_BLOCKS + 1) * 2 - var_ctrl.read_block_num - 1);
+  read_sensor_register( BOTTOM_HALF, (uint8_t*)&ss_dat.RAMoutput[bottomblock], BLOCK_LENGTH);
 
 
-  read_block_num++;
+  var_ctrl.read_block_num++;
 
-  if (read_block_num < NUMBER_OF_BLOCKS)
+  if (var_ctrl.read_block_num < NUMBER_OF_BLOCKS)
   {
 
     // to start sensor set configuration register to 0x09
     // |    RFU    |   Block   | Start | VDD_MEAS | BLIND | WAKEUP |
     // |  0  |  0  |  x  |  x  |   1   |    0     |   0   |    1   |
-    write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x09 + (0x10 * read_block_num) + (0x04 * switch_ptat_vdd)));
+    write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x09 + (0x10 * var_ctrl.read_block_num) + (0x04 * var_ctrl.switch_ptat_vdd)));
   }else
   {
     //*******************************************************************
     // all blocks for the current image are sampled, now check if its time
-    // to get new electrical offsets and/or for switching PTAT and VDD
+    // to get new pve_buf.electrical offsets and/or for switching PTAT and VDD
     //*******************************************************************
 
-    if (read_eloffset_next_pic)
+    if (var_ctrl.read_eloffset_next_pic)
     {
-      read_eloffset_next_pic = 0;
+      var_ctrl.read_eloffset_next_pic = 0;
 
       // |    RFU    |   Block   | Start | VDD_MEAS | BLIND | WAKEUP |
       // |  0  |  0  |  0  |  0  |   1   |    0     |   1   |    1   |
-      write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x0B + (0x04 * switch_ptat_vdd)));
-      new_offsets = 1;
+      write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x0B + (0x04 * var_ctrl.switch_ptat_vdd)));
+      pve_buf.new_offsets = 1;
     }else
     {
-      if (picnum > 1)  state = 1; // state = 1 means that all required blocks are sampled
-      picnum++; // increase the picture counter
-      // check if the next sample routine should include electrical offsets
-      if ((uint8_t)(picnum % READ_ELOFFSET_EVERYX) == 0)
-        read_eloffset_next_pic = 1;
+      if (var_ctrl.picnum > 1)  var_ctrl.state = 1; // var_ctrl.state = 1 means that all required blocks are sampled
+      var_ctrl.picnum++; // increase the picture counter
+      // check if the next sample routine should include pve_buf.electrical offsets
+      if ((uint8_t)(var_ctrl.picnum % READ_ELOFFSET_EVERYX) == 0)
+        var_ctrl.read_eloffset_next_pic = 1;
 
 
       if (DevConst.PTATVDDSwitch)
-        switch_ptat_vdd ^= 1;
+        var_ctrl.switch_ptat_vdd ^= 1;
 
 
-      read_block_num = 0;
+      var_ctrl.read_block_num = 0;
 
       // |    RFU    |   Block   | Start | VDD_MEAS | BLIND | WAKEUP |
       // |  0  |  0  |  0  |  0  |   1   |    0     |   0   |    1   |
-      write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x09 + (0x04 * switch_ptat_vdd)));
+      write_sensor_byte(SENSOR_ADDRESS, CONFIGURATION_REGISTER, (uint8_t)(0x09 + (0x04 * var_ctrl.switch_ptat_vdd)));
     }
   }
 
-  __HAL_TIM_SET_AUTORELOAD(&htim3, timert);
-  ReadingRoutineEnable = 1;
+  __HAL_TIM_SET_AUTORELOAD(&htim3, var_ctrl.timert);
+  var_ctrl.ReadingRoutineEnable = 1;
 }
 
 
@@ -783,79 +770,79 @@ void read_eeprom(void)
   int m = 0;
   int n = 0;
   uint8_t b[4];
-  id = read_EEPROM_byte(E_ID4) << 24 | read_EEPROM_byte(E_ID3) << 16 | read_EEPROM_byte(E_ID2) << 8 | read_EEPROM_byte(E_ID1);
-  mbit_calib = read_EEPROM_byte(E_MBIT_CALIB);
-  bias_calib = read_EEPROM_byte(E_BIAS_CALIB);
-  clk_calib = read_EEPROM_byte(E_CLK_CALIB);
-  bpa_calib = read_EEPROM_byte(E_BPA_CALIB);
-  pu_calib = read_EEPROM_byte(E_PU_CALIB);
-  mbit_user = read_EEPROM_byte(E_MBIT_USER);
-  bias_user = read_EEPROM_byte(E_BIAS_USER);
-  clk_user = read_EEPROM_byte(E_CLK_USER);
-  bpa_user = read_EEPROM_byte(E_BPA_USER);
-  pu_user = read_EEPROM_byte(E_PU_USER);
-  vddth1 = read_EEPROM_byte(E_VDDTH1_2) << 8 | read_EEPROM_byte(E_VDDTH1_1);
-  vddth2 = read_EEPROM_byte(E_VDDTH2_2) << 8 | read_EEPROM_byte(E_VDDTH2_1);
-  vddscgrad = read_EEPROM_byte(E_VDDSCGRAD);
-  vddscoff = read_EEPROM_byte(E_VDDSCOFF);
-  ptatth1 = read_EEPROM_byte(E_PTATTH1_2) << 8 | read_EEPROM_byte(E_PTATTH1_1);
-  ptatth2 = read_EEPROM_byte(E_PTATTH2_2) << 8 | read_EEPROM_byte(E_PTATTH2_1);
-  nrofdefpix = read_EEPROM_byte(E_NROFDEFPIX);
-  gradscale = read_EEPROM_byte(E_GRADSCALE);
-  tablenumber = read_EEPROM_byte(E_TABLENUMBER2) << 8 | read_EEPROM_byte(E_TABLENUMBER1);
-  arraytype = read_EEPROM_byte(E_ARRAYTYPE);
+  eep.id = read_EEPROM_byte(E_ID4) << 24 | read_EEPROM_byte(E_ID3) << 16 | read_EEPROM_byte(E_ID2) << 8 | read_EEPROM_byte(E_ID1);
+  eep.mbit_calib = read_EEPROM_byte(E_MBIT_CALIB);
+  eep.bias_calib = read_EEPROM_byte(E_BIAS_CALIB);
+  eep.clk_calib = read_EEPROM_byte(E_CLK_CALIB);
+  eep.bpa_calib = read_EEPROM_byte(E_BPA_CALIB);
+  eep.pu_calib = read_EEPROM_byte(E_PU_CALIB);
+  eep.mbit_user = read_EEPROM_byte(E_MBIT_USER);
+  eep.bias_user = read_EEPROM_byte(E_BIAS_USER);
+  eep.clk_user = read_EEPROM_byte(E_CLK_USER);
+  eep.bpa_user = read_EEPROM_byte(E_BPA_USER);
+  eep.pu_user = read_EEPROM_byte(E_PU_USER);
+  eep.vddth1 = read_EEPROM_byte(E_VDDTH1_2) << 8 | read_EEPROM_byte(E_VDDTH1_1);
+  eep.vddth2 = read_EEPROM_byte(E_VDDTH2_2) << 8 | read_EEPROM_byte(E_VDDTH2_1);
+  eep.vddscgrad = read_EEPROM_byte(E_VDDSCGRAD);
+  eep.vddscoff = read_EEPROM_byte(E_VDDSCOFF);
+  eep.ptatth1 = read_EEPROM_byte(E_PTATTH1_2) << 8 | read_EEPROM_byte(E_PTATTH1_1);
+  eep.ptatth2 = read_EEPROM_byte(E_PTATTH2_2) << 8 | read_EEPROM_byte(E_PTATTH2_1);
+  eep.nrofdefpix = read_EEPROM_byte(E_NROFDEFPIX);
+  eep.gradscale = read_EEPROM_byte(E_GRADSCALE);
+  eep.tablenumber = read_EEPROM_byte(E_TABLENUMBER2) << 8 | read_EEPROM_byte(E_TABLENUMBER1);
+  eep.arraytype = read_EEPROM_byte(E_ARRAYTYPE);
   b[0] = read_EEPROM_byte(E_PTATGR_1);
   b[1] = read_EEPROM_byte(E_PTATGR_2);
   b[2] = read_EEPROM_byte(E_PTATGR_3);
   b[3] = read_EEPROM_byte(E_PTATGR_4);
-  ptatgr_float = *(float*)b;
+  eep.ptatgr_float = *(float*)b;
   b[0] = read_EEPROM_byte(E_PTATOFF_1);
   b[1] = read_EEPROM_byte(E_PTATOFF_2);
   b[2] = read_EEPROM_byte(E_PTATOFF_3);
   b[3] = read_EEPROM_byte(E_PTATOFF_4);
-  ptatoff_float = *(float*)b;
+  eep.ptatoff_float = *(float*)b;
   b[0] = read_EEPROM_byte(E_PIXCMIN_1);
   b[1] = read_EEPROM_byte(E_PIXCMIN_2);
   b[2] = read_EEPROM_byte(E_PIXCMIN_3);
   b[3] = read_EEPROM_byte(E_PIXCMIN_4);
-  pixcmin = *(float*)b;
+  eep.pixcmin = *(float*)b;
   b[0] = read_EEPROM_byte(E_PIXCMAX_1);
   b[1] = read_EEPROM_byte(E_PIXCMAX_2);
   b[2] = read_EEPROM_byte(E_PIXCMAX_3);
   b[3] = read_EEPROM_byte(E_PIXCMAX_4);
-  pixcmax = *(float*)b;
-  epsilon = read_EEPROM_byte(E_EPSILON);
-  globaloff = read_EEPROM_byte(E_GLOBALOFF);
-  globalgain = read_EEPROM_byte(E_GLOBALGAIN_2) << 8 | read_EEPROM_byte(E_GLOBALGAIN_1);
+  eep.pixcmax = *(float*)b;
+  eep.epsilon = read_EEPROM_byte(E_EPSILON);
+  eep.globaloff = read_EEPROM_byte(E_GLOBALOFF);
+  eep.globalgain = read_EEPROM_byte(E_GLOBALGAIN_2) << 8 | read_EEPROM_byte(E_GLOBALGAIN_1);
 
 
   // for (int m = 0; m < DevConst.PixelPerColumn; m++) {
   //   for (int n = 0; n < DevConst.PixelPerRow; n++) {
 
   // --- DeadPixAdr ---
-  for (int i = 0; i < nrofdefpix; i++) {
-    deadpixadr[i] = read_EEPROM_byte(E_DEADPIXADR + 2 * i + 1 ) << 8 | read_EEPROM_byte(E_DEADPIXADR + 2 * i);
-    if (deadpixadr[i] > (uint16_t)(DevConst.NumberOfPixel / 2)) {  // adaptedAdr:
-      deadpixadr[i] = (uint16_t)(DevConst.NumberOfPixel) + (uint16_t)(DevConst.NumberOfPixel / 2) - deadpixadr[i] + 2 * (uint16_t)(deadpixadr[i] % DevConst.PixelPerRow ) - DevConst.PixelPerRow;
+  for (int i = 0; i < eep.nrofdefpix; i++) {
+    eep.deadpixadr[i] = read_EEPROM_byte(E_DEADPIXADR + 2 * i + 1 ) << 8 | read_EEPROM_byte(E_DEADPIXADR + 2 * i);
+    if (eep.deadpixadr[i] > (uint16_t)(DevConst.NumberOfPixel / 2)) {  // adaptedAdr:
+      eep.deadpixadr[i] = (uint16_t)(DevConst.NumberOfPixel) + (uint16_t)(DevConst.NumberOfPixel / 2) - eep.deadpixadr[i] + 2 * (uint16_t)(eep.deadpixadr[i] % DevConst.PixelPerRow ) - DevConst.PixelPerRow;
     }
   }
 
 
   // --- DeadPixMask ---
-  for (int i = 0; i < nrofdefpix; i++) {
-    deadpixmask[i] = read_EEPROM_byte(E_DEADPIXMASK + i);
+  for (int i = 0; i < eep.nrofdefpix; i++) {
+    eep.deadpixmask[i] = read_EEPROM_byte(E_DEADPIXMASK + i);
   }
 
 
   // --- Thgrad_ij, ThOffset_ij and P_ij ---
   m = 0;
   n = 0;
-  pixc2 = pixc2_0; // set pointer to start address of the allocated heap // reset pointer to initial address
+  eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap // reset pointer to initial address
   // top half
   for (int i = 0; i < (uint16_t)(DevConst.NumberOfPixel / 2); i++) {
-    thgrad[m][n] = read_EEPROM_byte(E_THGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_THGRAD + 2 * i);
-    thoffset[m][n] = read_EEPROM_byte(E_THOFFSET + 2 * i + 1) << 8 | read_EEPROM_byte(E_THOFFSET + 2 * i);
-    *(pixc2 + m * DevConst.PixelPerRow + n) = read_EEPROM_byte(E_PIJ + 2 * i + 1) << 8 | read_EEPROM_byte(E_PIJ + 2 * i);
+    eep.thgrad[m][n] = read_EEPROM_byte(E_THGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_THGRAD + 2 * i);
+    eep.thoffset[m][n] = read_EEPROM_byte(E_THOFFSET + 2 * i + 1) << 8 | read_EEPROM_byte(E_THOFFSET + 2 * i);
+    *(eep.pixc2 + m * DevConst.PixelPerRow + n) = read_EEPROM_byte(E_PIJ + 2 * i + 1) << 8 | read_EEPROM_byte(E_PIJ + 2 * i);
     n++;
     if (n ==  DevConst.PixelPerRow) {
       n = 0;
@@ -866,9 +853,9 @@ void read_eeprom(void)
   m = (uint8_t)(DevConst.PixelPerColumn - 1);
   n = 0;
   for (int i = (uint16_t)(DevConst.NumberOfPixel / 2); i < (uint16_t)(DevConst.NumberOfPixel); i++) {
-    thgrad[m][n] = read_EEPROM_byte(E_THGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_THGRAD + 2 * i);
-    thoffset[m][n] = read_EEPROM_byte(E_THOFFSET + 2 * i + 1) << 8 | read_EEPROM_byte(E_THOFFSET + 2 * i);
-    *(pixc2 + m * DevConst.PixelPerRow + n) = read_EEPROM_byte(E_PIJ + 2 * i + 1) << 8 | read_EEPROM_byte(E_PIJ + 2 * i);
+    eep.thgrad[m][n] = read_EEPROM_byte(E_THGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_THGRAD + 2 * i);
+    eep.thoffset[m][n] = read_EEPROM_byte(E_THOFFSET + 2 * i + 1) << 8 | read_EEPROM_byte(E_THOFFSET + 2 * i);
+    *(eep.pixc2 + m * DevConst.PixelPerRow + n) = read_EEPROM_byte(E_PIJ + 2 * i + 1) << 8 | read_EEPROM_byte(E_PIJ + 2 * i);
     n++;
 
     if (n ==  DevConst.PixelPerRow) {
@@ -883,8 +870,8 @@ void read_eeprom(void)
   n = 0;
   // top half
   for (int i = 0; i < (uint16_t)(DevConst.PixelPerBlock); i++) {
-    vddcompgrad[m][n] = read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i);
-    vddcompoff[m][n] = read_EEPROM_byte(E_VDDCOMPOFF + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPOFF + 2 * i);
+    eep.vddcompgrad[m][n] = read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i);
+    eep.vddcompoff[m][n] = read_EEPROM_byte(E_VDDCOMPOFF + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPOFF + 2 * i);
     n++;
     if (n ==  DevConst.PixelPerRow) {
       n = 0;
@@ -895,8 +882,8 @@ void read_eeprom(void)
   m = (uint8_t)(DevConst.RowPerBlock * 2 - 1);
   n = 0;
   for (int i = (uint16_t)(DevConst.PixelPerBlock); i < (uint16_t)(DevConst.PixelPerBlock * 2); i++) {
-    vddcompgrad[m][n] = read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i);
-    vddcompoff[m][n] = read_EEPROM_byte(E_VDDCOMPOFF + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPOFF + 2 * i);
+    eep.vddcompgrad[m][n] = read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPGRAD + 2 * i);
+    eep.vddcompoff[m][n] = read_EEPROM_byte(E_VDDCOMPOFF + 2 * i + 1) << 8 | read_EEPROM_byte(E_VDDCOMPOFF + 2 * i);
     n++;
     if (n ==  DevConst.PixelPerRow) {
       n = 0;
@@ -934,8 +921,8 @@ void sort_data(void)
     for (int n = 0; n < DevConst.PixelPerRow; n++) {
 
       /*
-         for example: a normal line of RAMoutput for HTPAd80x64 looks like:
-         RAMoutput[0][] = [ PTAT(MSB), PTAT(LSB), DATA0[MSB], DATA0[LSB], DATA1[MSB], DATA1[LSB], ... , DATA640[MSB], DATA640LSB];
+         for example: a normal line of ss_dat.RAMoutput for HTPAd80x64 looks like:
+         ss_dat.RAMoutput[0][] = [ PTAT(MSB), PTAT(LSB), DATA0[MSB], DATA0[LSB], DATA1[MSB], DATA1[LSB], ... , DATA640[MSB], DATA640LSB];
                                                       |
                                                       |-- DATA_Pos = 2 (first data uint8_t)
       */
@@ -948,36 +935,36 @@ void sort_data(void)
       ******************************************************************************************************************/
       for (int i = 0; i < DevConst.NumberOfBlocks; i++) {
         // top half
-        data_pixel[m + i * DevConst.RowPerBlock][n] =
-          (uint16_t)(RAMoutput[i][pos] << 8 | RAMoutput[i][pos + 1]);
+        ss_dat.data_pixel[m + i * DevConst.RowPerBlock][n] =
+          (uint16_t)(ss_dat.RAMoutput[i][pos] << 8 | ss_dat.RAMoutput[i][pos + 1]);
         // bottom half
-        data_pixel[DevConst.PixelPerColumn - 1 - m - i * DevConst.RowPerBlock][n] =
-          (uint16_t)(RAMoutput[2 * DevConst.NumberOfBlocks + 2 - i - 1][pos] << 8 | RAMoutput[2 * DevConst.NumberOfBlocks + 2 - i - 1][pos + 1]);
+        ss_dat.data_pixel[DevConst.PixelPerColumn - 1 - m - i * DevConst.RowPerBlock][n] =
+          (uint16_t)(ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks + 2 - i - 1][pos] << 8 | ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks + 2 - i - 1][pos + 1]);
       }
 
 
       /******************************************************************************************************************
         new electrical offset values (store them in electrical offset buffer and calculate the average for pixel compensation
       ******************************************************************************************************************/
-      if (picnum % ELOFFSETS_BUFFER_SIZE == 1) {
-        if ((!eloffset[m][n]) || (picnum < ELOFFSETS_FILTER_START_DELAY)) {
+      if (var_ctrl.picnum % ELOFFSETS_BUFFER_SIZE == 1) {
+        if ((!ss_dat.eloffset[m][n]) || (var_ctrl.picnum < ELOFFSETS_FILTER_START_DELAY)) {
           // top half
-          eloffset[m][n] = (uint16_t)(RAMoutput[DevConst.NumberOfBlocks][pos] << 8 | RAMoutput[DevConst.NumberOfBlocks][pos + 1]);
+          ss_dat.eloffset[m][n] = (uint16_t)(ss_dat.RAMoutput[DevConst.NumberOfBlocks][pos] << 8 | ss_dat.RAMoutput[DevConst.NumberOfBlocks][pos + 1]);
           // bottom half
-          eloffset[2 * DevConst.RowPerBlock - 1 - m][n] = (uint16_t)(RAMoutput[DevConst.NumberOfBlocks + 1][pos] << 8 | RAMoutput[DevConst.NumberOfBlocks + 1][pos + 1]);
-          use_eloffsets_buffer = 1;
+          ss_dat.eloffset[2 * DevConst.RowPerBlock - 1 - m][n] = (uint16_t)(ss_dat.RAMoutput[DevConst.NumberOfBlocks + 1][pos] << 8 | ss_dat.RAMoutput[DevConst.NumberOfBlocks + 1][pos + 1]);
+          pve_buf.use_eloffsets_buffer = 1;
 
         }
         else {
           // use a moving average filter
           // top half
-          sum = (uint32_t)eloffset[m][n] * (uint32_t)(ELOFFSETS_BUFFER_SIZE - 1);
-          sum += (uint32_t)(RAMoutput[DevConst.NumberOfBlocks][pos] << 8 | RAMoutput[DevConst.NumberOfBlocks][pos + 1]);
-          eloffset[m][n] = (uint16_t)((float)sum / ELOFFSETS_BUFFER_SIZE + 0.5);
+          sum = (uint32_t)ss_dat.eloffset[m][n] * (uint32_t)(ELOFFSETS_BUFFER_SIZE - 1);
+          sum += (uint32_t)(ss_dat.RAMoutput[DevConst.NumberOfBlocks][pos] << 8 | ss_dat.RAMoutput[DevConst.NumberOfBlocks][pos + 1]);
+          ss_dat.eloffset[m][n] = (uint16_t)((float)sum / ELOFFSETS_BUFFER_SIZE + 0.5);
           // bottom half
-          sum = (uint32_t)eloffset[2 * DevConst.RowPerBlock - 1 - m][n] * (uint32_t)(ELOFFSETS_BUFFER_SIZE - 1);
-          sum += (uint32_t)(RAMoutput[DevConst.NumberOfBlocks + 1][pos] << 8 | RAMoutput[DevConst.NumberOfBlocks + 1][pos + 1]);
-          eloffset[2 * DevConst.RowPerBlock - 1 - m][n] = (uint16_t)((float)sum / ELOFFSETS_BUFFER_SIZE + 0.5);
+          sum = (uint32_t)ss_dat.eloffset[2 * DevConst.RowPerBlock - 1 - m][n] * (uint32_t)(ELOFFSETS_BUFFER_SIZE - 1);
+          sum += (uint32_t)(ss_dat.RAMoutput[DevConst.NumberOfBlocks + 1][pos] << 8 | ss_dat.RAMoutput[DevConst.NumberOfBlocks + 1][pos + 1]);
+          ss_dat.eloffset[2 * DevConst.RowPerBlock - 1 - m][n] = (uint16_t)((float)sum / ELOFFSETS_BUFFER_SIZE + 0.5);
         }
       }
 
@@ -990,36 +977,36 @@ void sort_data(void)
   /******************************************************************************************************************
     new PTAT values (store them in PTAT buffer and calculate the average for pixel compensation
   ******************************************************************************************************************/
-  if (switch_ptat_vdd == 1) {
+  if (var_ctrl.switch_ptat_vdd == 1) {
     sum = 0;
     // calculate ptat average (datasheet, chapter: 11.1 Ambient Temperature )
     for (int i = 0; i < DevConst.NumberOfBlocks; i++) {
       // block top half
-      sum += (uint16_t)(RAMoutput[i][DevConst.PTATPos] << 8 | RAMoutput[i][DevConst.PTATPos + 1]);
+      sum += (uint16_t)(ss_dat.RAMoutput[i][DevConst.PTATPos] << 8 | ss_dat.RAMoutput[i][DevConst.PTATPos + 1]);
       // block bottom half
-      sum += (uint16_t)(RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.PTATPos] << 8 | RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.PTATPos + 1]);
+      sum += (uint16_t)(ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.PTATPos] << 8 | ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.PTATPos + 1]);
     }
-    ptat_av_uint16 = (uint16_t)((float)sum / (float)(2.0 * DevConst.NumberOfBlocks));
-    Ta = (uint16_t)((uint16_t)ptat_av_uint16 * (float)ptatgr_float + (float)ptatoff_float);
+    ss_dat.ptat_av_uint16 = (uint16_t)((float)sum / (float)(2.0 * DevConst.NumberOfBlocks));
+    ss_dat.Ta = (uint16_t)((uint16_t)ss_dat.ptat_av_uint16 * (float)eep.ptatgr_float + (float)eep.ptatoff_float);
 
 
-    ptat_buffer[ptat_i] = ptat_av_uint16;
-    ptat_i++;
-    if (ptat_i == PTAT_BUFFER_SIZE) {
-      if (use_ptat_buffer == 0) {
+    pve_buf.ptat_buffer[pve_buf.ptat_i] = ss_dat.ptat_av_uint16;
+    pve_buf.ptat_i++;
+    if (pve_buf.ptat_i == PTAT_BUFFER_SIZE) {
+      if (pve_buf.use_ptat_buffer == 0) {
         printf(" | PTAT buffer complete");
-        use_ptat_buffer = 1;
+        pve_buf.use_ptat_buffer = 1;
       }
-      ptat_i = 0;
+      pve_buf.ptat_i = 0;
     }
 
-    if (use_ptat_buffer) {
+    if (pve_buf.use_ptat_buffer) {
       // now overwrite the old ptat average
       sum = 0;
       for (int i = 0; i < PTAT_BUFFER_SIZE; i++) {
-        sum += ptat_buffer[i];
+        sum += pve_buf.ptat_buffer[i];
       }
-      ptat_av_uint16 = (uint16_t)((float)sum / PTAT_BUFFER_SIZE);
+      ss_dat.ptat_av_uint16 = (uint16_t)((float)sum / PTAT_BUFFER_SIZE);
     }
 
 
@@ -1029,35 +1016,35 @@ void sort_data(void)
   /******************************************************************************************************************
     new VDD values (store them in VDD buffer and calculate the average for pixel compensation
   ******************************************************************************************************************/
-  if (switch_ptat_vdd == 0) {
+  if (var_ctrl.switch_ptat_vdd == 0) {
     sum = 0;
     // calculate vdd average (datasheet, chapter: 11.4 Vdd Compensation )
     for (int i = 0; i < DevConst.NumberOfBlocks; i++) {
       // block top half
-      sum += (uint16_t)(RAMoutput[i][DevConst.VDDPos] << 8 | RAMoutput[i][DevConst.VDDPos + 1]);
+      sum += (uint16_t)(ss_dat.RAMoutput[i][DevConst.VDDPos] << 8 | ss_dat.RAMoutput[i][DevConst.VDDPos + 1]);
       // block bottom half
-      sum += (uint16_t)(RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.VDDPos] << 8 | RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.VDDPos + 1]);
+      sum += (uint16_t)(ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.VDDPos] << 8 | ss_dat.RAMoutput[2 * DevConst.NumberOfBlocks - i + 1][DevConst.VDDPos + 1]);
     }
-    vdd_av_uint16 = (uint16_t)((float)sum / (float)(2.0 * DevConst.NumberOfBlocks));
+    ss_dat.vdd_av_uint16 = (uint16_t)((float)sum / (float)(2.0 * DevConst.NumberOfBlocks));
 
 
     // write into vdd buffer
-    vdd_buffer[vdd_i] = vdd_av_uint16;
-    vdd_i++;
-    if (vdd_i == VDD_BUFFER_SIZE) {
-      if (use_vdd_buffer == 0) {
+    pve_buf.vdd_buffer[pve_buf.vdd_i] = ss_dat.vdd_av_uint16;
+    pve_buf.vdd_i++;
+    if (pve_buf.vdd_i == VDD_BUFFER_SIZE) {
+      if (pve_buf.use_vdd_buffer == 0) {
         printf(" | VDD buffer complete");
-        use_vdd_buffer = 1;
+        pve_buf.use_vdd_buffer = 1;
       }
-      vdd_i = 0;
+      pve_buf.vdd_i = 0;
     }
-    if (use_vdd_buffer) {
+    if (pve_buf.use_vdd_buffer) {
       sum = 0;
       for (int i = 0; i < VDD_BUFFER_SIZE; i++) {
-        sum += vdd_buffer[i];
+        sum += pve_buf.vdd_buffer[i];
       }
       // now overwrite the old vdd average
-      vdd_av_uint16 = (uint16_t)((float)sum / VDD_BUFFER_SIZE);
+      ss_dat.vdd_av_uint16 = (uint16_t)((float)sum / VDD_BUFFER_SIZE);
     }
 
   }
@@ -1072,19 +1059,19 @@ void sort_data(void)
 void write_calibration_settings_to_sensor(void)
 {
 
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER1, mbit_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER1, eep.mbit_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER2, bias_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER2, eep.bias_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER3, bias_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER3, eep.bias_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER4, clk_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER4, eep.clk_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER5, bpa_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER5, eep.bpa_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER6, bpa_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER6, eep.bpa_calib);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER7, pu_calib);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER7, eep.pu_calib);
   HAL_Delay(5);
 }
 
@@ -1143,19 +1130,19 @@ void write_sensor_byte(uint8_t deviceaddress, uint8_t registeraddress, uint8_t i
  *******************************************************************/
 void write_user_settings_to_sensor() {
 
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER1, mbit_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER1, eep.mbit_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER2, bias_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER2, eep.bias_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER3, bias_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER3, eep.bias_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER4, clk_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER4, eep.clk_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER5, bpa_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER5, eep.bpa_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER6, bpa_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER6, eep.bpa_user);
   HAL_Delay(5);
-  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER7, pu_user);
+  write_sensor_byte(SENSOR_ADDRESS, TRIM_REGISTER7, eep.pu_user);
   HAL_Delay(5);
 }
 
@@ -1187,7 +1174,7 @@ void print_final_array(void)
   {
     for (int n = 0; n < DevConst.PixelPerRow; n++)
     {
-      printf("%d",data_pixel[m][n]-2731);
+      printf("%d",ss_dat.data_pixel[m][n]-2731);
       printf("\t");
     }
     printf("\n");
@@ -1203,7 +1190,7 @@ void print_RAM_array(void)
   printf("\n\n\n---pixel data ---\n");
   for (int m = 0; m < (2 * NUMBER_OF_BLOCKS + 2); m++) {
     for (int n = 0; n < BLOCK_LENGTH; n++) {
-      printf("%x",RAMoutput[m][n]);
+      printf("%x",ss_dat.RAMoutput[m][n]);
       printf("\t");
     }
     printf("\n");
@@ -1232,183 +1219,175 @@ void checkSerial(void)
       break;
 
     case 'a':
-      if (send_data)
-        printf("stop data stream in GUI before\n");
-      else
+
         print_state = 1;
-      break;
 
     case 'b':
-      if (send_data)
-        printf("stop data stream in GUI before\n");
-      else
+
         print_state = 2;
       break;
 
     case 'c':
-      if (send_data)
-        printf("stop data stream in GUI before\n");
-      else
         print_state = 3;
       break;
 
 
     case 'm':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       print_menu();
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'd':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       print_eeprom_hex();
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'e':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       print_eeprom_header();
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'f':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       printf("\n\n\n---VddCompGrad---\n");
       for (int m = 0; m < (DevConst.RowPerBlock * 2); m++) {
         for (int n = 0; n < DevConst.PixelPerRow; n++) {
-          printf("%d\t",vddcompgrad[m][n]);
+          printf("%d\t",eep.vddcompgrad[m][n]);
         }
         printf("\n");
       }
       printf("\n\n\n");
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'g':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       printf("\n\n\n---VddCompOff---\n");
       for (int m = 0; m < (DevConst.RowPerBlock * 2); m++) {
         for (int n = 0; n < DevConst.PixelPerRow; n++) {
-          printf("%d\t",vddcompoff[m][n]);
+          printf("%d\t",eep.vddcompoff[m][n]);
         }
         printf("\n");
       }
       printf("\n\n\n");
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'h':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       printf("\n\n\n---ThGrad---\n");
       for (int m = 0; m < DevConst.PixelPerColumn; m++) {
         for (int n = 0; n < DevConst.PixelPerRow; n++) {
-          printf("%d\t",thgrad[m][n]);
+          printf("%d\t",eep.thgrad[m][n]);
         }
         printf("\n");
       }
       printf("\n\n\n");
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
 
 
     case 'i':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       // print ThOffset in serial monitor
       printf("\n\n\n---ThOffset---\n");
       for (int m = 0; m < DevConst.PixelPerColumn; m++) {
         for (int n = 0; n < DevConst.PixelPerRow; n++) {
-          printf("%d\t",thoffset[m][n]);
+          printf("%d\t",eep.thoffset[m][n]);
         }
         printf("\n");
       }
       printf("\n\n\n");
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'j':
-      while (state);
-      ReadingRoutineEnable = 0;
+      while (var_ctrl.state);
+      var_ctrl.ReadingRoutineEnable = 0;
       // print PixC in serial monitor
       printf("\n\n\n---PixC---\n");
-      pixc2 = pixc2_0; // set pointer to start address of the allocated heap
+      eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
       for (int m = 0; m < DevConst.PixelPerColumn; m++)
       {
         for (int n = 0; n < DevConst.PixelPerRow; n++)
         {
-          printf("%ld\t",*(pixc2 + m * DevConst.PixelPerRow + n));
+          printf("%ld\t",*(eep.pixc2 + m * DevConst.PixelPerRow + n));
         }
         printf("\n");
       }
       printf("\n\n\n");
-      ReadingRoutineEnable = 1;
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'k':
-      ReadingRoutineEnable = 0;
+      var_ctrl.ReadingRoutineEnable = 0;
       __HAL_TIM_SET_COUNTER(&htim3,0);
       printf("\n\n\n---Increase emissivity---\n");
-      printf("old emissivity: \t%d\n",epsilon);
+      printf("old emissivity: \t%d\n",eep.epsilon);
       printf("new emissivity: \t");
-      if (epsilon < 100) {
-        epsilon++;
+      if (eep.epsilon < 100) {
+        eep.epsilon++;
 
-        write_EEPROM_byte(E_EPSILON, epsilon);
+        write_EEPROM_byte(E_EPSILON, eep.epsilon);
 
 
-        // calculate pixcij with new epsilon
-        pixc2 = pixc2_0; // set pointer to start address of the allocated heap
-        double d = (double)epsilon / (double)lastepsilon;
+        // calculate pixcij with new eep.epsilon
+        eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
+        double d = (double)eep.epsilon / (double)eep.lastepsilon;
         for (int m = 0; m < DevConst.PixelPerColumn; m++) {
           for (int n = 0; n < DevConst.PixelPerRow; n++) {
-            *(pixc2 + m * DevConst.PixelPerRow + n) = (uint32_t)((double) * (pixc2 + m * DevConst.PixelPerRow + n) * (double)d);
+            *(eep.pixc2 + m * DevConst.PixelPerRow + n) = (uint32_t)((double) * (eep.pixc2 + m * DevConst.PixelPerRow + n) * (double)d);
           }
         }
-        lastepsilon = epsilon;
-        printf("%d (new emissivity is stored in the EEPROM now)\n",epsilon);
+        eep.lastepsilon = eep.epsilon;
+        printf("%d (new emissivity is stored in the EEPROM now)\n",eep.epsilon);
       }
       else {
-        printf("%d (you cannot set the emissivity higher than 100%%)\n",epsilon);
+        printf("%d (you cannot set the emissivity higher than 100%%)\n",eep.epsilon);
       }
       HAL_Delay(1000);
-      __HAL_TIM_SET_AUTORELOAD(&htim3, timert);
-      ReadingRoutineEnable = 1;
+      __HAL_TIM_SET_AUTORELOAD(&htim3, var_ctrl.timert);
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
     case 'l':
-      ReadingRoutineEnable = 0;
+      var_ctrl.ReadingRoutineEnable = 0;
       __HAL_TIM_SET_COUNTER(&htim3,0);
       printf("\n\n\n---Decrease emissivity---");
-      printf("\nold emissivity: \t%d",epsilon);
+      printf("\nold emissivity: \t%d",eep.epsilon);
       printf("\nnew emissivity: \t");
-      if (epsilon > 0) {
-        epsilon--;
-        write_EEPROM_byte(E_EPSILON, epsilon);
-        // calculate pixcij with new epsilon
-        pixc2 = pixc2_0; // set pointer to start address of the allocated heap
-        double d = (double)epsilon / (double)lastepsilon;
+      if (eep.epsilon > 0) {
+        eep.epsilon--;
+        write_EEPROM_byte(E_EPSILON, eep.epsilon);
+        // calculate pixcij with new eep.epsilon
+        eep.pixc2 = eep.pixc2_0; // set pointer to start address of the allocated heap
+        double d = (double)eep.epsilon / (double)eep.lastepsilon;
         for (int m = 0; m < DevConst.PixelPerColumn; m++) {
           for (int n = 0; n < DevConst.PixelPerRow; n++) {
-            *(pixc2 + m * DevConst.PixelPerRow + n) = (uint32_t)((double) * (pixc2 + m * DevConst.PixelPerRow + n) * (double)d);
+            *(eep.pixc2 + m * DevConst.PixelPerRow + n) = (uint32_t)((double) * (eep.pixc2 + m * DevConst.PixelPerRow + n) * (double)d);
           }
         }
-        lastepsilon = epsilon;
-        printf("%d (new emissivity is stored in the EEPROM now)",epsilon);
+        eep.lastepsilon = eep.epsilon;
+        printf("%d (new emissivity is stored in the EEPROM now)",eep.epsilon);
       }
       else {
-        printf("%d",epsilon);
+        printf("%d",eep.epsilon);
         printf(" (you cannot set the emissivity lower as 0%)");
       }
       HAL_Delay(1000);
-      __HAL_TIM_SET_AUTORELOAD(&htim3, timert);
-      ReadingRoutineEnable = 1;
+      __HAL_TIM_SET_AUTORELOAD(&htim3, var_ctrl.timert);
+      var_ctrl.ReadingRoutineEnable = 1;
       break;
 
 
@@ -1429,39 +1408,39 @@ void print_calc_steps2(void)
   uint16_t table_row, table_col;
   int32_t vx, vy, ydist, dta;
   signed long pixel;
-  pixc2 = pixc2_0;
+  eep.pixc2 = eep.pixc2_0;
 
   printf("\n\ncalculate the average of VDD and PTAT buffer\n");
 
   printf("PTATbuf[%d",PTAT_BUFFER_SIZE);
   printf("] = { ");
   for (int i = 0; i < PTAT_BUFFER_SIZE; i++) {
-    printf("%d",ptat_buffer[i]);
+    printf("%d",pve_buf.ptat_buffer[i]);
     if (i < (PTAT_BUFFER_SIZE - 1))
       printf(" , ");
     else
       printf(" }");
   }
-  printf("\nPTAT_average = %d",ptat_av_uint16);
+  printf("\nPTAT_average = %d",ss_dat.ptat_av_uint16);
 
   printf("\nVDDbuf[%d",VDD_BUFFER_SIZE);
   printf("] = { ");
   for (int i = 0; i < VDD_BUFFER_SIZE; i++) {
-    printf("%d",vdd_buffer[i]);
+    printf("%d",pve_buf.vdd_buffer[i]);
     if (i < (VDD_BUFFER_SIZE - 1))
       printf(" , ");
     else
       printf(" }");
   }
-  printf("\nVDD_average = %d",vdd_av_uint16);
+  printf("\nVDD_average = %d",ss_dat.vdd_av_uint16);
 
-  printf("\n\ncalculate ambient temperatur (Ta)\n");
-  printf("Ta = %d",ptat_av_uint16);
+  printf("\n\ncalculate ambient temperatur (ss_dat.Ta)\n");
+  printf("ss_dat.Ta = %d",ss_dat.ptat_av_uint16);
   printf(" * ");
-  printf("%.5f",ptatgr_float);
+  printf("%.5f",eep.ptatgr_float);
   printf(" + ");
-  printf("%.5f",ptatoff_float);
-  printf(" = %d",Ta);
+  printf("%.5f",eep.ptatoff_float);
+  printf(" = %d",ss_dat.Ta);
   printf(" (Value is given in dK)");
 
 
@@ -1469,11 +1448,11 @@ void print_calc_steps2(void)
     step 0: find column of lookup table
   ******************************************************************************************************************/
   for (int i = 0; i < NROFTAELEMENTS; i++) {
-    if (Ta > XTATemps[i]) {
+    if (ss_dat.Ta > XTATemps[i]) {
       table_col = i;
     }
   }
-  dta = Ta - XTATemps[table_col];
+  dta = ss_dat.Ta - XTATemps[table_col];
   ydist = (int32_t)ADEQUIDISTANCE;
 
   printf("\n\nprint all calculation steps for each pixel\n");
@@ -1502,22 +1481,22 @@ void print_calc_steps2(void)
       /******************************************************************************************************************
          step 1: use a variable with bigger data format for the compensation steps
        ******************************************************************************************************************/
-      pixel = (signed long) data_pixel[m][n];
+      pixel = (signed long) ss_dat.data_pixel[m][n];
       printf("\t%ld", pixel);
       /******************************************************************************************************************
          step 2: compensate thermal drifts (see datasheet, chapter: Thermal Offset)
        ******************************************************************************************************************/
-      pixel -= (int32_t)(((int32_t)thgrad[m][n] * (int32_t)ptat_av_uint16) / (int32_t)gradscale_div);
-      pixel -= (int32_t)thoffset[m][n];
+      pixel -= (int32_t)(((int32_t)eep.thgrad[m][n] * (int32_t)ss_dat.ptat_av_uint16) / (int32_t)var_ctrl.gradscale_div);
+      pixel -= (int32_t)eep.thoffset[m][n];
       printf("\t%ld",pixel);
       /******************************************************************************************************************
          step 3: compensate electrical offset (see datasheet, chapter: Electrical Offset)
        ******************************************************************************************************************/
       if (m < DevConst.PixelPerColumn / 2) { // top half
-        pixel -= eloffset[m % DevConst.RowPerBlock][n];
+        pixel -= ss_dat.eloffset[m % DevConst.RowPerBlock][n];
       }
       else { // bottom half
-        pixel -= eloffset[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        pixel -= ss_dat.eloffset[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
       }
       printf("\t%ld",pixel);
       /******************************************************************************************************************
@@ -1525,27 +1504,27 @@ void print_calc_steps2(void)
        ******************************************************************************************************************/
       // first select VddCompGrad and VddCompOff for pixel m,n:
       if (m < DevConst.PixelPerColumn / 2) {      // top half
-        vddcompgrad_n = vddcompgrad[m % DevConst.RowPerBlock][n];
-        vddcompoff_n = vddcompoff[m % DevConst.RowPerBlock][n];
+        var_ctrl.vddcompgrad_n = eep.vddcompgrad[m % DevConst.RowPerBlock][n];
+        var_ctrl.vddcompoff_n = eep.vddcompoff[m % DevConst.RowPerBlock][n];
       }
       else {       // bottom half
-        vddcompgrad_n = vddcompgrad[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
-        vddcompoff_n = vddcompoff[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        var_ctrl.vddcompgrad_n = eep.vddcompgrad[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
+        var_ctrl.vddcompoff_n = eep.vddcompoff[m % DevConst.RowPerBlock + DevConst.RowPerBlock][n];
       }
       // now do the vdd calculation
-      vdd_calc_steps = vddcompgrad_n * ptat_av_uint16;
-      vdd_calc_steps = vdd_calc_steps / vddscgrad_div;
-      vdd_calc_steps = vdd_calc_steps + vddcompoff_n;
-      vdd_calc_steps = vdd_calc_steps * ( vdd_av_uint16 - vddth1 - ((vddth2 - vddth1) / (ptatth2 - ptatth1)) * (ptat_av_uint16  - ptatth1));
-      vdd_calc_steps = vdd_calc_steps / vddscoff_div;
+      vdd_calc_steps = var_ctrl.vddcompgrad_n * ss_dat.ptat_av_uint16;
+      vdd_calc_steps = vdd_calc_steps / var_ctrl.vddscgrad_div;
+      vdd_calc_steps = vdd_calc_steps + var_ctrl.vddcompoff_n;
+      vdd_calc_steps = vdd_calc_steps * ( ss_dat.vdd_av_uint16 - eep.vddth1 - ((eep.vddth2 - eep.vddth1) / (eep.ptatth2 - eep.ptatth1)) * (ss_dat.ptat_av_uint16  - eep.ptatth1));
+      vdd_calc_steps = vdd_calc_steps / var_ctrl.vddscoff_div;
       pixel -= vdd_calc_steps;
       printf("\t%ld",pixel);
       /******************************************************************************************************************
          step 5: multiply sensitivity coeff for each pixel (see datasheet, chapter: Object Temperature)
        ******************************************************************************************************************/
       vij_pixc_and_pcscaleval = pixel * (int64_t)PCSCALEVAL;
-      pixel =  (int32_t)(vij_pixc_and_pcscaleval / *pixc2);
-      pixc2++;
+      pixel =  (int32_t)(vij_pixc_and_pcscaleval / *eep.pixc2);
+      eep.pixc2++;
       printf("\t%ld",pixel);
       /******************************************************************************************************************
          step 6: find correct temp for this sensor in lookup table and do a bilinear interpolation (see datasheet, chapter:  Look-up table)
@@ -1560,13 +1539,13 @@ void print_calc_steps2(void)
       /******************************************************************************************************************
          step 7: add GlobalOffset (stored as signed char)
        ******************************************************************************************************************/
-      pixel += globaloff;
+      pixel += eep.globaloff;
       printf("\t%ld",pixel);
       printf("\t %.0f\n",(float)((pixel - 2732) / 10.0));
       /******************************************************************************************************************
         step 8: overwrite the uncompensate pixel with the new calculated compensated value
       ******************************************************************************************************************/
-      data_pixel[m][n] = (uint16_t)pixel;
+      ss_dat.data_pixel[m][n] = (uint16_t)pixel;
 
     }
   }
@@ -1590,49 +1569,49 @@ void print_eeprom_header(void)
   printf("data\t\tregister\ttype\t\tvalue\n");
   printf("------------------------------------------------------------\n");
   printf("PixCmin\t\t0x00-0x03\tfloat\t\t");
-  printf("%0.0f",pixcmin);
+  printf("%0.0f",eep.pixcmin);
   printf("PixCmax\t\t0x04-0x07\tfloat\t\t");
-  printf("%0.0f",pixcmax);
+  printf("%0.0f",eep.pixcmax);
   printf("gradScale\t0x08\t\tuint8_t\t");
-  printf("%d\n",gradscale);
+  printf("%d\n",eep.gradscale);
   printf("TN\t\t0x0B-0x0C\tuint16_t\t");
-  printf("%d\n",tablenumber);
-  printf("epsilon\t\t0x0D\t\tuint8_t\t");
-  printf("%d\n",epsilon);
+  printf("%d\n",eep.tablenumber);
+  printf("eep.epsilon\t\t0x0D\t\tuint8_t\t");
+  printf("%d\n",eep.epsilon);
   printf("MBIT(calib)\t0x1A\t\tuint8_t\t");
-  printf("%d\n",mbit_calib);
+  printf("%d\n",eep.mbit_calib);
   printf("BIAS(calib)\t0x1B\t\tuint8_t\t");
-  printf("%d\n",bias_calib);
+  printf("%d\n",eep.bias_calib);
   printf("CLK(calib)\t0x1C\t\tuint8_t\t");
-  printf("%d\n",clk_calib);
+  printf("%d\n",eep.clk_calib);
   printf("BPA(calib)\t0x1D\t\tuint8_t\t");
-  printf("%d\n",bpa_calib);
+  printf("%d\n",eep.bpa_calib);
   printf("PU(calib)\t0x1E\t\tuint8_t\t");
-  printf("%d\n",pu_calib);
+  printf("%d\n",eep.pu_calib);
   printf("Arraytype\t0x22\t\tuint8_t\t");
-  printf("%d\n",arraytype);
+  printf("%d\n",eep.arraytype);
   printf("VDDTH1\t\t0x26-0x27\tuint16_t\t");
-  printf("%d\n",vddth1);
+  printf("%d\n",eep.vddth1);
   printf("VDDTH2\t\t0x28-0x29\tuint16_t\t");
-  printf("%d\n",vddth2);
+  printf("%d\n",eep.vddth2);
   printf("PTAT-gradient\t0x34-0x37\tfloat\t\t");
-  printf("%.4f\n",ptatgr_float);
+  printf("%.4f\n",eep.ptatgr_float);
   printf("PTAT-offset\t0x38-0x3B\tfloat\t\t");
-  printf("%.4f\n",ptatoff_float);
+  printf("%.4f\n",eep.ptatoff_float);
   printf("PTAT(Th1)\t0x3C-0x3D\tuint16_t\t");
-  printf("%d\n",ptatth1);
+  printf("%d\n",eep.ptatth1);
   printf("PTAT(Th2)\t0x3E-0x3F\tuint16_t\t");
-  printf("%d\n",ptatth2);
+  printf("%d\n",eep.ptatth2);
   printf("VddScGrad\t0x4E\t\tuint8_t\t");
-  printf("%d\n",vddscgrad);
+  printf("%d\n",eep.vddscgrad);
   printf("VddScOff\t0x4F\t\tuint8_t\t");
-  printf("%d\n",vddscoff);
+  printf("%d\n",eep.vddscoff);
   printf("GlobalOff\t0x54\t\tsigned char\t");
-  printf("%d\n",globaloff);
+  printf("%d\n",eep.globaloff);
   printf("GlobalGain\t0x55-0x56\tuint16_t\t");
-  printf("%d\n",globalgain);
+  printf("%d\n",eep.globalgain);
   printf("SensorID\t0x74-0x77\tuint32_t\t");
-  printf("%ld\n",id);
+  printf("%ld\n",eep.id);
 
 }
 
