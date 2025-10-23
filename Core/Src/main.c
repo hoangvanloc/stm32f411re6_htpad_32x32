@@ -61,6 +61,21 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+extern I2C_HandleTypeDef hi2c1;
+extern TIM_HandleTypeDef htim3;
+htpad_t htpad = {
+	.pve_buf =
+	{
+	   .new_offsets = 1
+	},
+	.var_ctrl =
+	{
+	  .ReadingRoutineEnable = 1,
+	  .read_block_num = START_WITH_BLOCK
+	},
+   .hi2c = &hi2c1,
+   .htim = &htim3,
+};
 
 /* USER CODE END 0 */
 
@@ -107,14 +122,14 @@ int main(void)
     Error_Handler();
   }
 
-  setup();
+  setup(&htpad);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  loop();
+	  loop(&htpad);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -170,13 +185,26 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-/**
-  * @brief  Rx Transfer completed callback
-  * @param  UartHandle: UART handle
-  * @note   This example shows a simple way to report end of DMA Rx transfer, and
-  *         you can add your own implementation.
-  * @retval None
-  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == htpad.htim->Instance)
+    {
+     // Called when TIM3 reaches its period and overflows
+  	  // read new sensor data
+		if (htpad.var_ctrl.ReadingRoutineEnable)
+		{
+		/*
+		   HINT:
+		   this interrupt service routine set a flag called NedDataAvailable.
+		   This flag will be checked in the main loop. If this flag is set, the main loop will call
+		   the function to read the new sensor data and reset this flag and the timer. I go that way
+		   because the ESP32 cannot read I2C data directly in the TimerISR. If your µC can handle I2C in
+		   an interrupt,please read the new sensor volatges direclty in the TimerISR.
+		*/
+			htpad.var_ctrl.NewDataAvailable = 1;
+		}
+    }
+}
 
 /* USER CODE END 4 */
 
