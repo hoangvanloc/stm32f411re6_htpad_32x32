@@ -38,20 +38,7 @@
 #include "uart_printf.h"
 
 
-
-
 characteristics DevConst = DevConstDEF;
-
-
-
-char serial_input = 'm';
-uint8_t print_state = 0;
-
-
-
-
-
-
 
 
 /********************************************************************
@@ -137,9 +124,7 @@ void setup(htpad_t* hd)
   //*******************************************************************
   // print the menu for the first time
   //*******************************************************************
-#ifdef SERIALMODE
-  print_menu();
-#endif
+
 
 }
 
@@ -178,9 +163,9 @@ void loop(htpad_t* hd)
   }
 
 
-#ifdef SERIALMODE
-  checkSerial(hd);
-#endif
+//#ifdef SERIALMODE
+//  checkSerial(hd);
+//#endif
   if (hd->var_ctrl.state)
   { // hd->var_ctrl.state is 1 when all raw sensor voltages are read for this picture
 
@@ -189,31 +174,30 @@ void loop(htpad_t* hd)
     //*******************************************************************
     // SERIAL OUTPUT
     //*******************************************************************
-
       // here the print functions are called for serial monitor output
       // (there was activate in checkSerial() function before)
 
       // print final pixel temperatures in dK
-      if (print_state == 1 || print_state == 4)
+      if (hd->var_ctrl.print_state == 1 || hd->var_ctrl.print_state == 4)
       {
         calculate_pixel_temp(hd);
-        if(print_state == 4)
+        if(hd->var_ctrl.print_state == 4)
         {
 
         }else
         {
           print_final_array(hd);
         }
-        print_state = 0;
-      }else if (print_state == 2)
+        hd->var_ctrl.print_state = 0;
+      }else if (hd->var_ctrl.print_state == 2)
       {
         print_RAM_array(hd);
-        print_state = 0;
+        hd->var_ctrl.print_state = 0;
       }else
-      if (print_state == 3)
+      if (hd->var_ctrl.print_state == 3)
       {
         print_calc_steps2(hd);
-        print_state = 0;
+        hd->var_ctrl.print_state = 0;
       }
   }
 
@@ -1009,7 +993,7 @@ void write_user_settings_to_sensor(htpad_t* hd)
  *******************************************************************/
 void print_final_array(htpad_t* hd)
 {
-  printf("\n\n---final array ---");
+  printf("\n\n---final array ---\n");
   for (int m = 0; m < DevConst.PixelPerColumn; m++)
   {
     for (int n = 0; n < DevConst.PixelPerRow; n++)
@@ -1047,6 +1031,7 @@ void print_RAM_array(htpad_t* hd)
  *******************************************************************/
 void checkSerial(htpad_t* hd)
 {
+	uint8_t serial_input;
   if(serial_available())
   {
 	  serial_input = serial_read();
@@ -1061,14 +1046,14 @@ void checkSerial(htpad_t* hd)
       break;
 
     case 'a':
-        print_state = 1;
+        hd->var_ctrl.print_state = 1;
       break;
     case 'b':
-        print_state = 2;
+        hd->var_ctrl.print_state = 2;
       break;
 
     case 'c':
-        print_state = 3;
+        hd->var_ctrl.print_state = 3;
       break;
 
 

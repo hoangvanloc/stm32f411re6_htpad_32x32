@@ -137,6 +137,7 @@ typedef struct
 	int32_t vddcompoff_n;
 	uint8_t NewDataAvailable;
 	uint16_t timert;
+	uint8_t print_state;
 }var_ctrl_t;
 
 typedef struct

@@ -62,8 +62,12 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 extern I2C_HandleTypeDef hi2c1;
+extern TIM_HandleTypeDef htim2;
+extern I2C_HandleTypeDef hi2c2;
 extern TIM_HandleTypeDef htim3;
-htpad_t htpad = {
+extern I2C_HandleTypeDef hi2c3;
+extern TIM_HandleTypeDef htim4;
+htpad_t htpad1 = {
 	.pve_buf =
 	{
 	   .new_offsets = 1
@@ -74,9 +78,66 @@ htpad_t htpad = {
 	  .read_block_num = START_WITH_BLOCK
 	},
    .hi2c = &hi2c1,
+   .htim = &htim2,
+};
+htpad_t htpad2 = {
+	.pve_buf =
+	{
+	   .new_offsets = 1
+	},
+	.var_ctrl =
+	{
+	  .ReadingRoutineEnable = 1,
+	  .read_block_num = START_WITH_BLOCK
+	},
+   .hi2c = &hi2c2,
    .htim = &htim3,
 };
+htpad_t htpad3 = {
+	.pve_buf =
+	{
+	   .new_offsets = 1
+	},
+	.var_ctrl =
+	{
+	  .ReadingRoutineEnable = 1,
+	  .read_block_num = START_WITH_BLOCK
+	},
+   .hi2c = &hi2c3,
+   .htim = &htim4,
+};
+char serial_input = 'm';
 
+uint8_t getserial(void)
+{
+  uint8_t print_state = 0;
+  uint8_t serial_input = 'm';
+  if(serial_available())
+  {
+	  serial_input = serial_read();
+  }else
+  {
+	  return 0;
+  }
+  switch (serial_input)
+  {
+    case 0xFF:
+      //nothing
+      break;
+
+    case 'a':
+        print_state = 1;
+      break;
+    case 'b':
+        print_state = 2;
+      break;
+
+    case 'c':
+        print_state = 3;
+      break;
+  }
+  return print_state;
+}
 /* USER CODE END 0 */
 
 /**
@@ -113,23 +174,49 @@ int main(void)
   MX_I2C3_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   printf("Application start!\n");
   uart_start_receive();
-  if (HAL_TIM_Base_Start_IT(&htim3) != HAL_OK)
+  if (HAL_TIM_Base_Start_IT(htpad1.htim) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
+  if (HAL_TIM_Base_Start_IT(htpad2.htim) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
+  if (HAL_TIM_Base_Start_IT(htpad3.htim) != HAL_OK)
   {
     /* Starting Error */
     Error_Handler();
   }
 
-  setup(&htpad);
+  setup(&htpad1);
+  setup(&htpad2);
+  setup(&htpad3);
+
+  print_menu();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  loop(&htpad);
+	  uint8_t print_state = getserial();
+     if(print_state)
+     {
+    	 htpad1.var_ctrl.print_state = print_state;
+    	 htpad2.var_ctrl.print_state = print_state;
+    	 htpad3.var_ctrl.print_state = print_state;
+     }
+	 loop(&htpad1);
+	 loop(&htpad2);
+	 loop(&htpad3);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -187,11 +274,11 @@ void SystemClock_Config(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == htpad.htim->Instance)
+    if (htim->Instance == htpad1.htim->Instance)
     {
      // Called when TIM3 reaches its period and overflows
   	  // read new sensor data
-		if (htpad.var_ctrl.ReadingRoutineEnable)
+		if (htpad1.var_ctrl.ReadingRoutineEnable)
 		{
 		/*
 		   HINT:
@@ -201,8 +288,40 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		   because the ESP32 cannot read I2C data directly in the TimerISR. If your µC can handle I2C in
 		   an interrupt,please read the new sensor volatges direclty in the TimerISR.
 		*/
-			htpad.var_ctrl.NewDataAvailable = 1;
+			htpad1.var_ctrl.NewDataAvailable = 1;
 		}
+    }else if (htim->Instance == htpad2.htim->Instance)
+    {
+	  // Called when TIM3 reaches its period and overflows
+	  // read new sensor data
+		if (htpad2.var_ctrl.ReadingRoutineEnable)
+		{
+		/*
+		   HINT:
+		   this interrupt service routine set a flag called NedDataAvailable.
+		   This flag will be checked in the main loop. If this flag is set, the main loop will call
+		   the function to read the new sensor data and reset this flag and the timer. I go that way
+		   because the ESP32 cannot read I2C data directly in the TimerISR. If your µC can handle I2C in
+		   an interrupt,please read the new sensor volatges direclty in the TimerISR.
+		*/
+			htpad2.var_ctrl.NewDataAvailable = 1;
+		}
+    }else if (htim->Instance == htpad3.htim->Instance)
+    {
+  	  // Called when TIM3 reaches its period and overflows
+  	  // read new sensor data
+  		if (htpad3.var_ctrl.ReadingRoutineEnable)
+  		{
+  		/*
+  		   HINT:
+  		   this interrupt service routine set a flag called NedDataAvailable.
+  		   This flag will be checked in the main loop. If this flag is set, the main loop will call
+  		   the function to read the new sensor data and reset this flag and the timer. I go that way
+  		   because the ESP32 cannot read I2C data directly in the TimerISR. If your µC can handle I2C in
+  		   an interrupt,please read the new sensor volatges direclty in the TimerISR.
+  		*/
+  			htpad3.var_ctrl.NewDataAvailable = 1;
+  		}
     }
 }
 
