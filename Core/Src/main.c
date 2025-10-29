@@ -179,21 +179,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("Application start!\n");
   uart_start_receive();
-  if (HAL_TIM_Base_Start_IT(htpad1.htim) != HAL_OK)
-  {
-    /* Starting Error */
-    Error_Handler();
-  }
-  if (HAL_TIM_Base_Start_IT(htpad2.htim) != HAL_OK)
-  {
-    /* Starting Error */
-    Error_Handler();
-  }
-  if (HAL_TIM_Base_Start_IT(htpad3.htim) != HAL_OK)
-  {
-    /* Starting Error */
-    Error_Handler();
-  }
+
 
   setup(&htpad1);
   setup(&htpad2);

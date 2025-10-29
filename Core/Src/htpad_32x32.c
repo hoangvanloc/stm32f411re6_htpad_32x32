@@ -83,8 +83,12 @@ void setup(htpad_t* hd)
   while (error != HAL_OK)
   {
     HAL_Delay(200);
-    uint8_t data = 0x00;
-    error = HAL_I2C_Master_Transmit(hd->hi2c,  (SENSOR_ADDRESS << 1) | 0x01, &data, 1, 10);
+    // Reinitialize the I2C peripheral
+    HAL_I2C_DeInit(hd->hi2c);
+    HAL_I2C_Init(hd->hi2c);
+
+    // Check device readiness
+     error = HAL_I2C_IsDeviceReady(hd->hi2c, SENSOR_ADDRESS << 1, 3, 100);
   }
   read_eeprom(hd);
 
@@ -120,6 +124,11 @@ void setup(htpad_t* hd)
   //*******************************************************************
   hd->var_ctrl.timert = calc_timert(hd->eep.clk_calib, hd->eep.mbit_calib);
   __HAL_TIM_SET_AUTORELOAD(hd->htim, hd->var_ctrl.timert);
+  if (HAL_TIM_Base_Start_IT(hd->htim) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
 
   //*******************************************************************
   // print the menu for the first time
@@ -726,7 +735,7 @@ void read_eeprom(htpad_t* hd)
  *******************************************************************/
 void read_sensor_register(htpad_t* hd, uint16_t addr, uint8_t *dest, uint16_t n)
 {
-  HAL_I2C_Mem_Read(hd->hi2c, SENSOR_ADDRESS << 1, addr, I2C_MEMADD_SIZE_8BIT, dest, n, 100);
+	HAL_I2C_Mem_Read(hd->hi2c, SENSOR_ADDRESS << 1, addr, I2C_MEMADD_SIZE_8BIT, dest, n, HAL_MAX_DELAY);
 }
 
 
@@ -907,7 +916,7 @@ void write_calibration_settings_to_sensor(htpad_t* hd)
 void write_EEPROM_byte(htpad_t* hd, uint16_t address, uint8_t content )
 {
   uint8_t data[] = {address >> 8, address & 0xff,content};
-  HAL_I2C_Master_Transmit(hd->hi2c, (EEPROM_ADDRESS << 1) | 0x01, data, 3, 100);
+  HAL_I2C_Master_Transmit(hd->hi2c, EEPROM_ADDRESS << 1, data, 3, 100);
 }
 
 
@@ -938,7 +947,7 @@ void write_sensor_byte(htpad_t* hd, uint8_t deviceaddress, uint8_t registeraddre
 {
 
   uint8_t byte_dat[]= {registeraddress, input };
-  HAL_I2C_Master_Transmit(hd->hi2c, (deviceaddress << 1) | 0x01, byte_dat, 2, 100);
+  HAL_I2C_Master_Transmit(hd->hi2c, deviceaddress << 1, byte_dat, 2, 100);
 
 }
 
