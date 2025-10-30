@@ -937,8 +937,7 @@ void I2C_Bus_Recovery(I2C_HandleTypeDef *hi2c)
 		   HAL_Delay(1);
 	   }
 
-	   // Reinitialize I2C peripheral
-	   MX_I2C1_Init(); // Replace with your I2C init function
+	   MX_I2C1_Init();
    }else if(hi2c->Instance == I2C2)
    {
 	   GPIO_InitStruct.Pin = GPIO_PIN_3;
@@ -978,8 +977,7 @@ void I2C_Bus_Recovery(I2C_HandleTypeDef *hi2c)
 		   HAL_Delay(1);
 	   }
 
-	   // Reinitialize I2C peripheral
-	   MX_I2C2_Init(); // Replace with your I2C init function
+	   MX_I2C2_Init();
    }else if(hi2c->Instance == I2C3)
       {
    	   GPIO_InitStruct.Pin = GPIO_PIN_9;
@@ -1018,9 +1016,7 @@ void I2C_Bus_Recovery(I2C_HandleTypeDef *hi2c)
    		   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
    		   HAL_Delay(1);
    	   }
-
-   	   // Reinitialize I2C peripheral
-   	   MX_I2C3_Init(); // Replace with your I2C init function
+   	   MX_I2C3_Init();
       }
 }
 
@@ -1046,7 +1042,7 @@ void I2C_HandleError(I2C_HandleTypeDef *hi2c)
         default:
             // Other errors — reset peripheral
             HAL_I2C_DeInit(hi2c);
-            MX_I2C1_Init(); // Replace with your I2C init
+            MX_I2C1_Init();
             break;
     }
 }
