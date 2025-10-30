@@ -28,7 +28,6 @@
 /* USER CODE BEGIN Includes */
 #include "htpad_32x32.h"
 #include <stdio.h>
-#include "i2c_scan.h"
 #include "uart_printf.h"
 /* USER CODE END Includes */
 

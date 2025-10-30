@@ -83,12 +83,12 @@ void setup(htpad_t* hd)
   while (error != HAL_OK)
   {
     HAL_Delay(200);
-    // Reinitialize the I2C peripheral
-    HAL_I2C_DeInit(hd->hi2c);
-    HAL_I2C_Init(hd->hi2c);
-
     // Check device readiness
      error = HAL_I2C_IsDeviceReady(hd->hi2c, SENSOR_ADDRESS << 1, 3, 100);
+	if(error != HAL_OK)
+	{
+	  I2C_HandleError(hd->hi2c);
+	}
   }
   read_eeprom(hd);
 
@@ -535,6 +535,7 @@ void readblockinterrupt(htpad_t* hd)
   while ((hd->ss_dat.statusreg & 0x01) == 0)
   {
     read_sensor_register(hd,  STATUS_REGISTER, (uint8_t*)&hd->ss_dat.statusreg, 1);
+    HAL_Delay(1);
   }
   // get data of top half:
   read_sensor_register(hd, TOP_HALF, (uint8_t*)&hd->ss_dat.RAMoutput[hd->var_ctrl.read_block_num], BLOCK_LENGTH);
@@ -727,18 +728,6 @@ void read_eeprom(htpad_t* hd)
 
 
 
-
-
-/********************************************************************
-   Function:        void read_sensor_register( uint16_t addr, uint8_t *dest, uint16_t n)
-   Description:     read sensor register
- *******************************************************************/
-void read_sensor_register(htpad_t* hd, uint16_t addr, uint8_t *dest, uint16_t n)
-{
-	HAL_I2C_Mem_Read(hd->hi2c, SENSOR_ADDRESS << 1, addr, I2C_MEMADD_SIZE_8BIT, dest, n, HAL_MAX_DELAY);
-}
-
-
 /********************************************************************
    Function:        void sort_data()
    Description:     sort the raw data blocks in 2d array and calculate ambient temperature, ptat and vdd
@@ -907,6 +896,175 @@ void write_calibration_settings_to_sensor(htpad_t* hd)
   HAL_Delay(5);
 }
 
+void I2C_Bus_Recovery(I2C_HandleTypeDef *hi2c)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+   if(hi2c->Instance == I2C1)
+   {
+	   GPIO_InitStruct.Pin = GPIO_PIN_7;
+	   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+	   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	   GPIO_InitStruct.Pin = GPIO_PIN_6;
+	   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+	   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	   // Check if SDA is stuck low
+	   if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_RESET)
+	   {
+		   // Clock out 9 pulses on SCL
+		   for (int i = 0; i < 9; i++)
+		   {
+			   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+			   HAL_Delay(1);
+			   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+			   HAL_Delay(1);
+		   }
+
+		   // Issue STOP condition
+		   GPIO_InitStruct.Pin = GPIO_PIN_7;
+		   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+		   GPIO_InitStruct.Pull = GPIO_NOPULL;
+		   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+		   HAL_Delay(1);
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+		   HAL_Delay(1);
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+		   HAL_Delay(1);
+	   }
+
+	   // Reinitialize I2C peripheral
+	   MX_I2C1_Init(); // Replace with your I2C init function
+   }else if(hi2c->Instance == I2C2)
+   {
+	   GPIO_InitStruct.Pin = GPIO_PIN_3;
+	   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+	   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	   GPIO_InitStruct.Pin = GPIO_PIN_10;
+	   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+	   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	   // Check if SDA is stuck low
+	   if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET)
+	   {
+		   // Clock out 9 pulses on SCL
+		   for (int i = 0; i < 9; i++)
+		   {
+			   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
+			   HAL_Delay(1);
+			   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+			   HAL_Delay(1);
+		   }
+
+		   // Issue STOP condition
+		   GPIO_InitTypeDef GPIO_InitStruct = {0};
+		   GPIO_InitStruct.Pin = GPIO_PIN_3;
+		   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+		   GPIO_InitStruct.Pull = GPIO_NOPULL;
+		   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
+		   HAL_Delay(1);
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+		   HAL_Delay(1);
+		   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
+		   HAL_Delay(1);
+	   }
+
+	   // Reinitialize I2C peripheral
+	   MX_I2C2_Init(); // Replace with your I2C init function
+   }else if(hi2c->Instance == I2C3)
+      {
+   	   GPIO_InitStruct.Pin = GPIO_PIN_9;
+   	   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+   	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+   	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+   	   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+   	   GPIO_InitStruct.Pin = GPIO_PIN_8;
+   	   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+   	   GPIO_InitStruct.Pull = GPIO_NOPULL;
+   	   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+   	   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+   	   // Check if SDA is stuck low
+   	   if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET)
+   	   {
+   		   // Clock out 9 pulses on SCL
+   		   for (int i = 0; i < 9; i++)
+   		   {
+   			   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+   			   HAL_Delay(1);
+   			   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+   			   HAL_Delay(1);
+   		   }
+
+   		   // Issue STOP condition
+   		   GPIO_InitTypeDef GPIO_InitStruct = {0};
+   		   GPIO_InitStruct.Pin = GPIO_PIN_9;
+   		   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+   		   GPIO_InitStruct.Pull = GPIO_NOPULL;
+   		   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+   		   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+   		   HAL_Delay(1);
+   		   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+   		   HAL_Delay(1);
+   		   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+   		   HAL_Delay(1);
+   	   }
+
+   	   // Reinitialize I2C peripheral
+   	   MX_I2C3_Init(); // Replace with your I2C init function
+      }
+}
+
+void I2C_HandleError(I2C_HandleTypeDef *hi2c)
+{
+    uint32_t error = HAL_I2C_GetError(hi2c);
+
+    switch (error) {
+        case HAL_I2C_ERROR_AF:
+            // Acknowledge failure — slave not responding
+            break;
+
+        case HAL_I2C_ERROR_BERR:
+        case HAL_I2C_ERROR_ARLO:
+        case HAL_I2C_ERROR_TIMEOUT:
+        	 HAL_I2C_DeInit(hi2c);
+            // Bus error, arbitration lost, or timeout — recover bus
+        	I2C_Bus_Recovery(hi2c);
+            break;
+
+        case HAL_I2C_ERROR_OVR:
+        case HAL_I2C_ERROR_DMA:
+        default:
+            // Other errors — reset peripheral
+            HAL_I2C_DeInit(hi2c);
+            MX_I2C1_Init(); // Replace with your I2C init
+            break;
+    }
+}
+
+
+
+/********************************************************************
+   Function:        void read_sensor_register( uint16_t addr, uint8_t *dest, uint16_t n)
+   Description:     read sensor register
+ *******************************************************************/
+void read_sensor_register(htpad_t* hd, uint16_t addr, uint8_t *dest, uint16_t n)
+{
+	uint8_t status = HAL_I2C_Mem_Read(hd->hi2c, SENSOR_ADDRESS << 1, addr, I2C_MEMADD_SIZE_8BIT, dest, n, 100);
+	if(status != HAL_OK)
+	{
+		I2C_HandleError(hd->hi2c);
+	}
+}
 
 /********************************************************************
    Function:        void read_EEPROM_byte(uint16_t eeaddress )
@@ -916,7 +1074,11 @@ void write_calibration_settings_to_sensor(htpad_t* hd)
 void write_EEPROM_byte(htpad_t* hd, uint16_t address, uint8_t content )
 {
   uint8_t data[] = {address >> 8, address & 0xff,content};
-  HAL_I2C_Master_Transmit(hd->hi2c, EEPROM_ADDRESS << 1, data, 3, 100);
+  uint8_t status = HAL_I2C_Master_Transmit(hd->hi2c, EEPROM_ADDRESS << 1, data, 3, 100);
+  if(status != HAL_OK)
+  {
+	I2C_HandleError(hd->hi2c);
+  }
 }
 
 
@@ -930,8 +1092,17 @@ uint8_t read_EEPROM_byte(htpad_t* hd, uint16_t address)
   uint8_t rdata = 0xFF;
   uint8_t pData[] = {address >> 8, address & 0xFF};
 
-  HAL_I2C_Master_Transmit(hd->hi2c, EEPROM_ADDRESS << 1, pData, 2, 100);
-  HAL_I2C_Master_Receive(hd->hi2c, EEPROM_ADDRESS << 1, &rdata, 1, 100);
+  uint8_t status = HAL_I2C_Master_Transmit(hd->hi2c, EEPROM_ADDRESS << 1, pData, 2, 100);
+  if(status != HAL_OK)
+  {
+	I2C_HandleError(hd->hi2c);
+  }
+
+  status = HAL_I2C_Master_Receive(hd->hi2c, EEPROM_ADDRESS << 1, &rdata, 1, 100);
+  if(status != HAL_OK)
+  {
+	I2C_HandleError(hd->hi2c);
+  }
   return rdata;
 }
 
@@ -947,8 +1118,11 @@ void write_sensor_byte(htpad_t* hd, uint8_t deviceaddress, uint8_t registeraddre
 {
 
   uint8_t byte_dat[]= {registeraddress, input };
-  HAL_I2C_Master_Transmit(hd->hi2c, deviceaddress << 1, byte_dat, 2, 100);
-
+  uint8_t status = HAL_I2C_Master_Transmit(hd->hi2c, deviceaddress << 1, byte_dat, 2, 100);
+  if(status != HAL_OK)
+  {
+	I2C_HandleError(hd->hi2c);
+  }
 }
 
 
