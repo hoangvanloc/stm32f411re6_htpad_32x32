@@ -192,7 +192,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint8_t print_state = getserial();
+	 uint8_t print_state = getserial();
      if(print_state)
      {
     	 htpad1.var_ctrl.print_state = print_state;
